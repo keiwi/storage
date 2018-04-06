@@ -7,9 +7,11 @@ import (
 	"math"
 
 	"github.com/keiwi/utils"
+	"github.com/keiwi/utils/log"
 	"github.com/keiwi/utils/models"
 	"github.com/nats-io/go-nats"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -103,7 +105,7 @@ func NewDatabase(user, password, host, port, dbname string) (*Database, error) {
 	}
 	database.UserManager = usersmgr
 
-	conn, err := nats.Connect(nats.DefaultURL)
+	conn, err := nats.Connect(viper.GetString("nats.url"))
 	if err != nil {
 		return nil, err
 	}
@@ -118,16 +120,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.retrieve.find")
 			return
 		}
-		utils.Log.Info("alerts.retrieve.find")
+		log.Info("alerts.retrieve.find")
 
 		manager := d.AlertManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("alerts.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("alerts.retrieve.find")
 			return
 		}
 
@@ -139,14 +141,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("alerts.retrieve.find - Retrieved")
+		log.Info("alerts.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.retrieve.find")
 			return
 		}
-		utils.Log.Info("alerts.retrieve.find - Reply")
+		log.Info("alerts.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -154,25 +156,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.retrieve.has")
 			return
 		}
-		utils.Log.Info("alerts.retrieve.has")
+		log.Info("alerts.retrieve.has")
 
 		manager := d.AlertManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("alerts.retrieve.has")
+			log.WithError(err).Error("alerts.retrieve.has")
 			return
 		}
-		utils.Log.Info("alerts.retrieve.has - Retrieved")
+		log.Info("alerts.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.retrieve.has")
 			return
 		}
-		utils.Log.Info("alerts.retrieve.has - Reply")
+		log.Info("alerts.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -180,10 +182,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.delete")
 			return
 		}
-		utils.Log.Info("alerts.delete")
+		log.Info("alerts.delete")
 
 		d.Conn.Publish("alerts.delete.before", m.Data)
 
@@ -191,24 +193,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("alerts.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("alerts.delete")
 			return
 		}
-		utils.Log.Info("alerts.delete - Found")
+		log.Info("alerts.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("alerts.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("alerts.delete")
 			return
 		}
-		utils.Log.Info("alerts.delete - Deleted")
+		log.Info("alerts.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.delete")
 			return
 		}
-		utils.Log.Info("alerts.delete - Reply")
+		log.Info("alerts.delete - Reply")
 
 		d.Conn.Publish("alerts.delete.after", data)
 	})
@@ -217,10 +219,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.update")
 			return
 		}
-		utils.Log.Info("alerts.update")
+		log.Info("alerts.update")
 
 		d.Conn.Publish("alerts.update.before", m.Data)
 
@@ -228,17 +230,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("alerts.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("alerts.update")
 			return
 		}
-		utils.Log.Info("alerts.update - Updated")
+		log.Info("alerts.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.update")
 			return
 		}
-		utils.Log.Info("alerts.update - Reply")
+		log.Info("alerts.update - Reply")
 
 		d.Conn.Publish("alerts.update.after", data)
 	})
@@ -247,10 +249,10 @@ func (d *Database) Listen() {
 		var before *models.Alert
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alerts.create")
 			return
 		}
-		utils.Log.Info("alerts.create")
+		log.Info("alerts.create")
 
 		d.Conn.Publish("alerts.create.before", m.Data)
 
@@ -258,17 +260,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("alerts.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("alerts.create")
 			return
 		}
-		utils.Log.Info("alerts.create - Created")
+		log.Info("alerts.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alerts.create")
 			return
 		}
-		utils.Log.Info("alerts.create - Reply")
+		log.Info("alerts.create - Reply")
 
 		d.Conn.Publish("alerts.create.after", data)
 	})
@@ -277,16 +279,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.retrieve.find")
 			return
 		}
-		utils.Log.Info("alert_options.retrieve.find")
+		log.Info("alert_options.retrieve.find")
 
 		manager := d.AlertOptionManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("alert_options.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("alert_options.retrieve.find")
 			return
 		}
 
@@ -298,14 +300,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("alert_options.retrieve.find - Retrieved")
+		log.Info("alert_options.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.retrieve.find")
 			return
 		}
-		utils.Log.Info("alert_options.retrieve.find - Reply")
+		log.Info("alert_options.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -313,25 +315,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.retrieve.has")
 			return
 		}
-		utils.Log.Info("alert_options.retrieve.has")
+		log.Info("alert_options.retrieve.has")
 
 		manager := d.AlertOptionManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("alert_options.retrieve.has")
+			log.WithError(err).Error("alert_options.retrieve.has")
 			return
 		}
-		utils.Log.Info("alert_options.retrieve.has - Retrieved")
+		log.Info("alert_options.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.retrieve.has")
 			return
 		}
-		utils.Log.Info("alert_options.retrieve.has - Reply")
+		log.Info("alert_options.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -339,10 +341,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.delete")
 			return
 		}
-		utils.Log.Info("alert_options.delete")
+		log.Info("alert_options.delete")
 
 		d.Conn.Publish("alert_options.delete.before", m.Data)
 
@@ -350,24 +352,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("alert_options.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("alert_options.delete")
 			return
 		}
-		utils.Log.Info("alert_options.delete - Found")
+		log.Info("alert_options.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("alert_options.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("alert_options.delete")
 			return
 		}
-		utils.Log.Info("alert_options.delete - Deleted")
+		log.Info("alert_options.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.delete")
 			return
 		}
-		utils.Log.Info("alert_options.delete - Reply")
+		log.Info("alert_options.delete - Reply")
 
 		d.Conn.Publish("alert_options.delete.after", data)
 	})
@@ -376,10 +378,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.update")
 			return
 		}
-		utils.Log.Info("alert_options.update")
+		log.Info("alert_options.update")
 
 		d.Conn.Publish("alert_options.update.before", m.Data)
 
@@ -387,17 +389,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("alert_options.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("alert_options.update")
 			return
 		}
-		utils.Log.Info("alert_options.update - Updated")
+		log.Info("alert_options.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.update")
 			return
 		}
-		utils.Log.Info("alert_options.update - Reply")
+		log.Info("alert_options.update - Reply")
 
 		d.Conn.Publish("alert_options.update.after", data)
 	})
@@ -406,10 +408,10 @@ func (d *Database) Listen() {
 		var before *models.AlertOption
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("alert_options.create")
 			return
 		}
-		utils.Log.Info("alert_options.create")
+		log.Info("alert_options.create")
 
 		d.Conn.Publish("alert_options.create.before", m.Data)
 
@@ -417,17 +419,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("alert_options.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("alert_options.create")
 			return
 		}
-		utils.Log.Info("alert_options.create - Created")
+		log.Info("alert_options.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("alert_options.create")
 			return
 		}
-		utils.Log.Info("alert_options.create - Reply")
+		log.Info("alert_options.create - Reply")
 
 		d.Conn.Publish("alert_options.create.after", data)
 	})
@@ -436,16 +438,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.retrieve.find")
 			return
 		}
-		utils.Log.Info("checks.retrieve.find")
+		log.Info("checks.retrieve.find")
 
 		manager := d.CheckManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("checks.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("checks.retrieve.find")
 			return
 		}
 
@@ -457,14 +459,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("checks.retrieve.find - Retrieved")
+		log.Info("checks.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.retrieve.find")
 			return
 		}
-		utils.Log.Info("checks.retrieve.find - Reply")
+		log.Info("checks.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -472,25 +474,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.retrieve.has")
 			return
 		}
-		utils.Log.Info("checks.retrieve.has")
+		log.Info("checks.retrieve.has")
 
 		manager := d.CheckManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("checks.retrieve.has")
+			log.WithError(err).Error("checks.retrieve.has")
 			return
 		}
-		utils.Log.Info("checks.retrieve.has - Retrieved")
+		log.Info("checks.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.retrieve.has")
 			return
 		}
-		utils.Log.Info("checks.retrieve.has - Reply")
+		log.Info("checks.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -498,10 +500,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.delete")
 			return
 		}
-		utils.Log.Info("checks.delete")
+		log.Info("checks.delete")
 
 		d.Conn.Publish("checks.delete.before", m.Data)
 
@@ -509,24 +511,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("checks.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("checks.delete")
 			return
 		}
-		utils.Log.Info("checks.delete - Found")
+		log.Info("checks.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("checks.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("checks.delete")
 			return
 		}
-		utils.Log.Info("checks.delete - Deleted")
+		log.Info("checks.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.delete")
 			return
 		}
-		utils.Log.Info("checks.delete - Reply")
+		log.Info("checks.delete - Reply")
 
 		d.Conn.Publish("checks.delete.after", data)
 	})
@@ -535,10 +537,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.update")
 			return
 		}
-		utils.Log.Info("checks.update")
+		log.Info("checks.update")
 
 		d.Conn.Publish("checks.update.before", m.Data)
 
@@ -546,17 +548,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("checks.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("checks.update")
 			return
 		}
-		utils.Log.Info("checks.update - Updated")
+		log.Info("checks.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.update")
 			return
 		}
-		utils.Log.Info("checks.update - Reply")
+		log.Info("checks.update - Reply")
 
 		d.Conn.Publish("checks.update.after", data)
 	})
@@ -565,10 +567,10 @@ func (d *Database) Listen() {
 		var before *models.Check
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("checks.create")
 			return
 		}
-		utils.Log.Info("checks.create")
+		log.Info("checks.create")
 
 		d.Conn.Publish("checks.create.before", m.Data)
 
@@ -576,17 +578,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("checks.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("checks.create")
 			return
 		}
-		utils.Log.Info("checks.create - Created")
+		log.Info("checks.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("checks.create")
 			return
 		}
-		utils.Log.Info("checks.create - Reply")
+		log.Info("checks.create - Reply")
 
 		d.Conn.Publish("checks.create.after", data)
 	})
@@ -595,16 +597,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.retrieve.find")
 			return
 		}
-		utils.Log.Info("clients.retrieve.find")
+		log.Info("clients.retrieve.find")
 
 		manager := d.ClientManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("clients.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("clients.retrieve.find")
 			return
 		}
 
@@ -616,14 +618,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("clients.retrieve.find - Retrieved")
+		log.Info("clients.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.retrieve.find")
 			return
 		}
-		utils.Log.Info("clients.retrieve.find - Reply")
+		log.Info("clients.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -631,25 +633,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.retrieve.has")
 			return
 		}
-		utils.Log.Info("clients.retrieve.has")
+		log.Info("clients.retrieve.has")
 
 		manager := d.ClientManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("clients.retrieve.has")
+			log.WithError(err).Error("clients.retrieve.has")
 			return
 		}
-		utils.Log.Info("clients.retrieve.has - Retrieved")
+		log.Info("clients.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.retrieve.has")
 			return
 		}
-		utils.Log.Info("clients.retrieve.has - Reply")
+		log.Info("clients.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -657,10 +659,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.delete")
 			return
 		}
-		utils.Log.Info("clients.delete")
+		log.Info("clients.delete")
 
 		d.Conn.Publish("clients.delete.before", m.Data)
 
@@ -668,24 +670,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("clients.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("clients.delete")
 			return
 		}
-		utils.Log.Info("clients.delete - Found")
+		log.Info("clients.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("clients.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("clients.delete")
 			return
 		}
-		utils.Log.Info("clients.delete - Deleted")
+		log.Info("clients.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.delete")
 			return
 		}
-		utils.Log.Info("clients.delete - Reply")
+		log.Info("clients.delete - Reply")
 
 		d.Conn.Publish("clients.delete.after", data)
 	})
@@ -694,10 +696,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.update")
 			return
 		}
-		utils.Log.Info("clients.update")
+		log.Info("clients.update")
 
 		d.Conn.Publish("clients.update.before", m.Data)
 
@@ -705,17 +707,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("clients.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("clients.update")
 			return
 		}
-		utils.Log.Info("clients.update - Updated")
+		log.Info("clients.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.update")
 			return
 		}
-		utils.Log.Info("clients.update - Reply")
+		log.Info("clients.update - Reply")
 
 		d.Conn.Publish("clients.update.after", data)
 	})
@@ -724,10 +726,10 @@ func (d *Database) Listen() {
 		var before *models.Client
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("clients.create")
 			return
 		}
-		utils.Log.Info("clients.create")
+		log.Info("clients.create")
 
 		d.Conn.Publish("clients.create.before", m.Data)
 
@@ -735,17 +737,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("clients.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("clients.create")
 			return
 		}
-		utils.Log.Info("clients.create - Created")
+		log.Info("clients.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("clients.create")
 			return
 		}
-		utils.Log.Info("clients.create - Reply")
+		log.Info("clients.create - Reply")
 
 		d.Conn.Publish("clients.create.after", data)
 	})
@@ -754,16 +756,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.retrieve.find")
 			return
 		}
-		utils.Log.Info("commands.retrieve.find")
+		log.Info("commands.retrieve.find")
 
 		manager := d.CommandManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("commands.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("commands.retrieve.find")
 			return
 		}
 
@@ -775,14 +777,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("commands.retrieve.find - Retrieved")
+		log.Info("commands.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.retrieve.find")
 			return
 		}
-		utils.Log.Info("commands.retrieve.find - Reply")
+		log.Info("commands.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -790,25 +792,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.retrieve.has")
 			return
 		}
-		utils.Log.Info("commands.retrieve.has")
+		log.Info("commands.retrieve.has")
 
 		manager := d.CommandManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("commands.retrieve.has")
+			log.WithError(err).Error("commands.retrieve.has")
 			return
 		}
-		utils.Log.Info("commands.retrieve.has - Retrieved")
+		log.Info("commands.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.retrieve.has")
 			return
 		}
-		utils.Log.Info("commands.retrieve.has - Reply")
+		log.Info("commands.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -816,10 +818,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.delete")
 			return
 		}
-		utils.Log.Info("commands.delete")
+		log.Info("commands.delete")
 
 		d.Conn.Publish("commands.delete.before", m.Data)
 
@@ -827,24 +829,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("commands.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("commands.delete")
 			return
 		}
-		utils.Log.Info("commands.delete - Found")
+		log.Info("commands.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("commands.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("commands.delete")
 			return
 		}
-		utils.Log.Info("commands.delete - Deleted")
+		log.Info("commands.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.delete")
 			return
 		}
-		utils.Log.Info("commands.delete - Reply")
+		log.Info("commands.delete - Reply")
 
 		d.Conn.Publish("commands.delete.after", data)
 	})
@@ -853,10 +855,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.update")
 			return
 		}
-		utils.Log.Info("commands.update")
+		log.Info("commands.update")
 
 		d.Conn.Publish("commands.update.before", m.Data)
 
@@ -864,17 +866,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("commands.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("commands.update")
 			return
 		}
-		utils.Log.Info("commands.update - Updated")
+		log.Info("commands.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.update")
 			return
 		}
-		utils.Log.Info("commands.update - Reply")
+		log.Info("commands.update - Reply")
 
 		d.Conn.Publish("commands.update.after", data)
 	})
@@ -883,10 +885,10 @@ func (d *Database) Listen() {
 		var before *models.Command
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("commands.create")
 			return
 		}
-		utils.Log.Info("commands.create")
+		log.Info("commands.create")
 
 		d.Conn.Publish("commands.create.before", m.Data)
 
@@ -894,17 +896,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("commands.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("commands.create")
 			return
 		}
-		utils.Log.Info("commands.create - Created")
+		log.Info("commands.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("commands.create")
 			return
 		}
-		utils.Log.Info("commands.create - Reply")
+		log.Info("commands.create - Reply")
 
 		d.Conn.Publish("commands.create.after", data)
 	})
@@ -913,16 +915,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.retrieve.find")
 			return
 		}
-		utils.Log.Info("groups.retrieve.find")
+		log.Info("groups.retrieve.find")
 
 		manager := d.GroupManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("groups.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("groups.retrieve.find")
 			return
 		}
 
@@ -934,14 +936,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("groups.retrieve.find - Retrieved")
+		log.Info("groups.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.retrieve.find")
 			return
 		}
-		utils.Log.Info("groups.retrieve.find - Reply")
+		log.Info("groups.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -949,25 +951,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.retrieve.has")
 			return
 		}
-		utils.Log.Info("groups.retrieve.has")
+		log.Info("groups.retrieve.has")
 
 		manager := d.GroupManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("groups.retrieve.has")
+			log.WithError(err).Error("groups.retrieve.has")
 			return
 		}
-		utils.Log.Info("groups.retrieve.has - Retrieved")
+		log.Info("groups.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.retrieve.has")
 			return
 		}
-		utils.Log.Info("groups.retrieve.has - Reply")
+		log.Info("groups.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -975,10 +977,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.delete")
 			return
 		}
-		utils.Log.Info("groups.delete")
+		log.Info("groups.delete")
 
 		d.Conn.Publish("groups.delete.before", m.Data)
 
@@ -986,24 +988,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("groups.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("groups.delete")
 			return
 		}
-		utils.Log.Info("groups.delete - Found")
+		log.Info("groups.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("groups.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("groups.delete")
 			return
 		}
-		utils.Log.Info("groups.delete - Deleted")
+		log.Info("groups.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.delete")
 			return
 		}
-		utils.Log.Info("groups.delete - Reply")
+		log.Info("groups.delete - Reply")
 
 		d.Conn.Publish("groups.delete.after", data)
 	})
@@ -1012,10 +1014,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.update")
 			return
 		}
-		utils.Log.Info("groups.update")
+		log.Info("groups.update")
 
 		d.Conn.Publish("groups.update.before", m.Data)
 
@@ -1023,17 +1025,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("groups.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("groups.update")
 			return
 		}
-		utils.Log.Info("groups.update - Updated")
+		log.Info("groups.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.update")
 			return
 		}
-		utils.Log.Info("groups.update - Reply")
+		log.Info("groups.update - Reply")
 
 		d.Conn.Publish("groups.update.after", data)
 	})
@@ -1042,10 +1044,10 @@ func (d *Database) Listen() {
 		var before *models.Group
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("groups.create")
 			return
 		}
-		utils.Log.Info("groups.create")
+		log.Info("groups.create")
 
 		d.Conn.Publish("groups.create.before", m.Data)
 
@@ -1053,17 +1055,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("groups.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("groups.create")
 			return
 		}
-		utils.Log.Info("groups.create - Created")
+		log.Info("groups.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("groups.create")
 			return
 		}
-		utils.Log.Info("groups.create - Reply")
+		log.Info("groups.create - Reply")
 
 		d.Conn.Publish("groups.create.after", data)
 	})
@@ -1072,16 +1074,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.retrieve.find")
 			return
 		}
-		utils.Log.Info("servers.retrieve.find")
+		log.Info("servers.retrieve.find")
 
 		manager := d.ServerManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("servers.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("servers.retrieve.find")
 			return
 		}
 
@@ -1093,14 +1095,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("servers.retrieve.find - Retrieved")
+		log.Info("servers.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.retrieve.find")
 			return
 		}
-		utils.Log.Info("servers.retrieve.find - Reply")
+		log.Info("servers.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1108,25 +1110,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.retrieve.has")
 			return
 		}
-		utils.Log.Info("servers.retrieve.has")
+		log.Info("servers.retrieve.has")
 
 		manager := d.ServerManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("servers.retrieve.has")
+			log.WithError(err).Error("servers.retrieve.has")
 			return
 		}
-		utils.Log.Info("servers.retrieve.has - Retrieved")
+		log.Info("servers.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.retrieve.has")
 			return
 		}
-		utils.Log.Info("servers.retrieve.has - Reply")
+		log.Info("servers.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1134,10 +1136,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.delete")
 			return
 		}
-		utils.Log.Info("servers.delete")
+		log.Info("servers.delete")
 
 		d.Conn.Publish("servers.delete.before", m.Data)
 
@@ -1145,24 +1147,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("servers.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("servers.delete")
 			return
 		}
-		utils.Log.Info("servers.delete - Found")
+		log.Info("servers.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("servers.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("servers.delete")
 			return
 		}
-		utils.Log.Info("servers.delete - Deleted")
+		log.Info("servers.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.delete")
 			return
 		}
-		utils.Log.Info("servers.delete - Reply")
+		log.Info("servers.delete - Reply")
 
 		d.Conn.Publish("servers.delete.after", data)
 	})
@@ -1171,10 +1173,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.update")
 			return
 		}
-		utils.Log.Info("servers.update")
+		log.Info("servers.update")
 
 		d.Conn.Publish("servers.update.before", m.Data)
 
@@ -1182,17 +1184,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("servers.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("servers.update")
 			return
 		}
-		utils.Log.Info("servers.update - Updated")
+		log.Info("servers.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.update")
 			return
 		}
-		utils.Log.Info("servers.update - Reply")
+		log.Info("servers.update - Reply")
 
 		d.Conn.Publish("servers.update.after", data)
 	})
@@ -1201,10 +1203,10 @@ func (d *Database) Listen() {
 		var before *models.Server
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("servers.create")
 			return
 		}
-		utils.Log.Info("servers.create")
+		log.Info("servers.create")
 
 		d.Conn.Publish("servers.create.before", m.Data)
 
@@ -1212,17 +1214,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("servers.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("servers.create")
 			return
 		}
-		utils.Log.Info("servers.create - Created")
+		log.Info("servers.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("servers.create")
 			return
 		}
-		utils.Log.Info("servers.create - Reply")
+		log.Info("servers.create - Reply")
 
 		d.Conn.Publish("servers.create.after", data)
 	})
@@ -1231,16 +1233,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.retrieve.find")
 			return
 		}
-		utils.Log.Info("uploads.retrieve.find")
+		log.Info("uploads.retrieve.find")
 
 		manager := d.UploadManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("uploads.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("uploads.retrieve.find")
 			return
 		}
 
@@ -1252,14 +1254,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("uploads.retrieve.find - Retrieved")
+		log.Info("uploads.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.retrieve.find")
 			return
 		}
-		utils.Log.Info("uploads.retrieve.find - Reply")
+		log.Info("uploads.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1267,25 +1269,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.retrieve.has")
 			return
 		}
-		utils.Log.Info("uploads.retrieve.has")
+		log.Info("uploads.retrieve.has")
 
 		manager := d.UploadManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("uploads.retrieve.has")
+			log.WithError(err).Error("uploads.retrieve.has")
 			return
 		}
-		utils.Log.Info("uploads.retrieve.has - Retrieved")
+		log.Info("uploads.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.retrieve.has")
 			return
 		}
-		utils.Log.Info("uploads.retrieve.has - Reply")
+		log.Info("uploads.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1293,10 +1295,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.delete")
 			return
 		}
-		utils.Log.Info("uploads.delete")
+		log.Info("uploads.delete")
 
 		d.Conn.Publish("uploads.delete.before", m.Data)
 
@@ -1304,24 +1306,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("uploads.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("uploads.delete")
 			return
 		}
-		utils.Log.Info("uploads.delete - Found")
+		log.Info("uploads.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("uploads.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("uploads.delete")
 			return
 		}
-		utils.Log.Info("uploads.delete - Deleted")
+		log.Info("uploads.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.delete")
 			return
 		}
-		utils.Log.Info("uploads.delete - Reply")
+		log.Info("uploads.delete - Reply")
 
 		d.Conn.Publish("uploads.delete.after", data)
 	})
@@ -1330,10 +1332,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.update")
 			return
 		}
-		utils.Log.Info("uploads.update")
+		log.Info("uploads.update")
 
 		d.Conn.Publish("uploads.update.before", m.Data)
 
@@ -1341,17 +1343,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("uploads.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("uploads.update")
 			return
 		}
-		utils.Log.Info("uploads.update - Updated")
+		log.Info("uploads.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.update")
 			return
 		}
-		utils.Log.Info("uploads.update - Reply")
+		log.Info("uploads.update - Reply")
 
 		d.Conn.Publish("uploads.update.after", data)
 	})
@@ -1360,10 +1362,10 @@ func (d *Database) Listen() {
 		var before *models.Upload
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("uploads.create")
 			return
 		}
-		utils.Log.Info("uploads.create")
+		log.Info("uploads.create")
 
 		d.Conn.Publish("uploads.create.before", m.Data)
 
@@ -1371,17 +1373,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("uploads.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("uploads.create")
 			return
 		}
-		utils.Log.Info("uploads.create - Created")
+		log.Info("uploads.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("uploads.create")
 			return
 		}
-		utils.Log.Info("uploads.create - Reply")
+		log.Info("uploads.create - Reply")
 
 		d.Conn.Publish("uploads.create.after", data)
 	})
@@ -1390,16 +1392,16 @@ func (d *Database) Listen() {
 		var find utils.FindOptions
 		err := bson.UnmarshalJSON(m.Data, &find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("users.retrieve.find")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("users.retrieve.find")
 			return
 		}
-		utils.Log.Info("users.retrieve.find")
+		log.Info("users.retrieve.find")
 
 		manager := d.UserManager
 
 		inter, err := manager.Find(find)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("users.retrieve.find")
+			log.WithError(errors.Wrap(err, "error retrieving data")).Error("users.retrieve.find")
 			return
 		}
 
@@ -1411,14 +1413,14 @@ func (d *Database) Listen() {
 			}
 			inter = n
 		}
-		utils.Log.Info("users.retrieve.find - Retrieved")
+		log.Info("users.retrieve.find - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.retrieve.find")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.retrieve.find")
 			return
 		}
-		utils.Log.Info("users.retrieve.find - Reply")
+		log.Info("users.retrieve.find - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1426,25 +1428,25 @@ func (d *Database) Listen() {
 		var has utils.HasOptions
 		err := bson.UnmarshalJSON(m.Data, &has)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("users.retrieve.has")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("users.retrieve.has")
 			return
 		}
-		utils.Log.Info("users.retrieve.has")
+		log.Info("users.retrieve.has")
 
 		manager := d.UserManager
 		inter, err := manager.Has(has)
 		if err != nil {
-			utils.Log.WithError(err).Error("users.retrieve.has")
+			log.WithError(err).Error("users.retrieve.has")
 			return
 		}
-		utils.Log.Info("users.retrieve.has - Retrieved")
+		log.Info("users.retrieve.has - Retrieved")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.retrieve.has")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.retrieve.has")
 			return
 		}
-		utils.Log.Info("users.retrieve.has - Reply")
+		log.Info("users.retrieve.has - Reply")
 		d.Conn.Publish(m.Reply, data)
 	})
 
@@ -1452,10 +1454,10 @@ func (d *Database) Listen() {
 		var del utils.DeleteOptions
 		err := bson.UnmarshalJSON(m.Data, &del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("users.delete")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("users.delete")
 			return
 		}
-		utils.Log.Info("users.delete")
+		log.Info("users.delete")
 
 		d.Conn.Publish("users.delete.before", m.Data)
 
@@ -1463,24 +1465,24 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("users.delete")
+			log.WithError(errors.Wrap(err, "error finding data")).Error("users.delete")
 			return
 		}
-		utils.Log.Info("users.delete - Found")
+		log.Info("users.delete - Found")
 
 		err = manager.Delete(del)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("users.delete")
+			log.WithError(errors.Wrap(err, "error deleting data")).Error("users.delete")
 			return
 		}
-		utils.Log.Info("users.delete - Deleted")
+		log.Info("users.delete - Deleted")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.delete")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.delete")
 			return
 		}
-		utils.Log.Info("users.delete - Reply")
+		log.Info("users.delete - Reply")
 
 		d.Conn.Publish("users.delete.after", data)
 	})
@@ -1489,10 +1491,10 @@ func (d *Database) Listen() {
 		var update utils.UpdateOptions
 		err := bson.UnmarshalJSON(m.Data, &update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("users.update")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("users.update")
 			return
 		}
-		utils.Log.Info("users.update")
+		log.Info("users.update")
 
 		d.Conn.Publish("users.update.before", m.Data)
 
@@ -1500,17 +1502,17 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Update(update)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("users.update")
+			log.WithError(errors.Wrap(err, "error updating data")).Error("users.update")
 			return
 		}
-		utils.Log.Info("users.update - Updated")
+		log.Info("users.update - Updated")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.update")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.update")
 			return
 		}
-		utils.Log.Info("users.update - Reply")
+		log.Info("users.update - Reply")
 
 		d.Conn.Publish("users.update.after", data)
 	})
@@ -1519,10 +1521,10 @@ func (d *Database) Listen() {
 		var before *models.User
 		err := bson.UnmarshalJSON(m.Data, &before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("users.create")
+			log.WithError(errors.Wrap(err, "error decoding event")).Error("users.create")
 			return
 		}
-		utils.Log.Info("users.create")
+		log.Info("users.create")
 
 		d.Conn.Publish("users.create.before", m.Data)
 
@@ -1530,28 +1532,29 @@ func (d *Database) Listen() {
 
 		inter, err := manager.Create(before)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("users.create")
+			log.WithError(errors.Wrap(err, "error creating data")).Error("users.create")
 			return
 		}
-		utils.Log.Info("users.create - Created")
+		log.Info("users.create - Created")
 
 		data, err := bson.MarshalJSON(inter)
 		if err != nil {
-			utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.create")
+			log.WithError(errors.Wrap(err, "error marshaling event")).Error("users.create")
 			return
 		}
-		utils.Log.Info("users.create - Reply")
+		log.Info("users.create - Reply")
 
 		d.Conn.Publish("users.create.after", data)
 	})
 
 }
 
-func (d *Database) Close() {
+func (d *Database) Close() error {
 	if d.db.Session != nil {
 		d.db.Session.Close()
 	}
 	if d.Conn != nil {
 		d.Conn.Close()
 	}
+	return nil
 }

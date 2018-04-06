@@ -7,11 +7,13 @@ import(
     "math"
 
     "github.com/keiwi/utils"
+    "github.com/keiwi/utils/log"
     "github.com/keiwi/utils/models"
     "github.com/nats-io/go-nats"
     "github.com/pkg/errors"
     "gopkg.in/mgo.v2"
     "gopkg.in/mgo.v2/bson"
+    "github.com/spf13/viper"
 )
 
 // DB abstraction
@@ -50,7 +52,7 @@ func NewDatabase(user, password, host, port, dbname string) (*Database, error) {
         database.{{.Name}}Manager = {{.ID}}mgr
     {{end}}
 
-    conn, err := nats.Connect(nats.DefaultURL)
+    conn, err := nats.Connect(viper.GetString("nats.url"))
     if err != nil {
         return nil, err
     }
@@ -66,16 +68,16 @@ func (d *Database) Listen() {
             var find utils.FindOptions
             err := bson.UnmarshalJSON(m.Data, &find)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.retrieve.find")
+                log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.retrieve.find")
                 return
             }
-            utils.Log.Info("{{.ID}}.retrieve.find")
+            log.Info("{{.ID}}.retrieve.find")
 
             manager := d.{{.Name}}Manager
 
             inter, err := manager.Find(find)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error retrieving data")).Error("{{.ID}}.retrieve.find")
+                log.WithError(errors.Wrap(err, "error retrieving data")).Error("{{.ID}}.retrieve.find")
                 return
             }
 
@@ -87,14 +89,14 @@ func (d *Database) Listen() {
                 }
                 inter = n
             }
-            utils.Log.Info("{{.ID}}.retrieve.find - Retrieved")
+            log.Info("{{.ID}}.retrieve.find - Retrieved")
 
             data, err := bson.MarshalJSON(inter)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.retrieve.find")
+                log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.retrieve.find")
                 return
             }
-            utils.Log.Info("{{.ID}}.retrieve.find - Reply")
+            log.Info("{{.ID}}.retrieve.find - Reply")
             d.Conn.Publish(m.Reply, data)
         })
 
@@ -102,25 +104,25 @@ func (d *Database) Listen() {
             var has utils.HasOptions
             err := bson.UnmarshalJSON(m.Data, &has)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.retrieve.has")
+                log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.retrieve.has")
                 return
             }
-            utils.Log.Info("{{.ID}}.retrieve.has")
+            log.Info("{{.ID}}.retrieve.has")
 
             manager := d.{{.Name}}Manager
             inter, err := manager.Has(has)
             if err != nil {
-                utils.Log.WithError(err).Error("{{.ID}}.retrieve.has")
+                log.WithError(err).Error("{{.ID}}.retrieve.has")
                 return
             }
-            utils.Log.Info("{{.ID}}.retrieve.has - Retrieved")
+            log.Info("{{.ID}}.retrieve.has - Retrieved")
 
             data, err := bson.MarshalJSON(inter)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.retrieve.has")
+                log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.retrieve.has")
                 return
             }
-            utils.Log.Info("{{.ID}}.retrieve.has - Reply")
+            log.Info("{{.ID}}.retrieve.has - Reply")
             d.Conn.Publish(m.Reply, data)
         })
 
@@ -128,10 +130,10 @@ func (d *Database) Listen() {
             var del utils.DeleteOptions
             err := bson.UnmarshalJSON(m.Data, &del)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.delete")
+                log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.delete")
                 return
             }
-            utils.Log.Info("{{.ID}}.delete")
+            log.Info("{{.ID}}.delete")
 
             d.Conn.Publish("{{.ID}}.delete.before", m.Data)
 
@@ -139,25 +141,25 @@ func (d *Database) Listen() {
 
             inter, err := manager.Find(utils.FindOptions{Filter: del.Filter})
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error finding data")).Error("{{.ID}}.delete")
+                log.WithError(errors.Wrap(err, "error finding data")).Error("{{.ID}}.delete")
                 return
             }
-            utils.Log.Info("{{.ID}}.delete - Found")
+            log.Info("{{.ID}}.delete - Found")
 
             err = manager.Delete(del)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error deleting data")).Error("{{.ID}}.delete")
+                log.WithError(errors.Wrap(err, "error deleting data")).Error("{{.ID}}.delete")
                 return
             }
-            utils.Log.Info("{{.ID}}.delete - Deleted")
+            log.Info("{{.ID}}.delete - Deleted")
 
 
             data, err := bson.MarshalJSON(inter)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.delete")
+                log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.delete")
                 return
             }
-            utils.Log.Info("{{.ID}}.delete - Reply")
+            log.Info("{{.ID}}.delete - Reply")
 
             d.Conn.Publish("{{.ID}}.delete.after", data)
         })
@@ -166,10 +168,10 @@ func (d *Database) Listen() {
             var update utils.UpdateOptions
             err := bson.UnmarshalJSON(m.Data, &update)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.update")
+                log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.update")
                 return
             }
-            utils.Log.Info("{{.ID}}.update")
+            log.Info("{{.ID}}.update")
 
             d.Conn.Publish("{{.ID}}.update.before", m.Data)
 
@@ -177,17 +179,17 @@ func (d *Database) Listen() {
 
             inter, err := manager.Update(update)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error updating data")).Error("{{.ID}}.update")
+                log.WithError(errors.Wrap(err, "error updating data")).Error("{{.ID}}.update")
                 return
             }
-            utils.Log.Info("{{.ID}}.update - Updated")
+            log.Info("{{.ID}}.update - Updated")
 
             data, err := bson.MarshalJSON(inter)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.update")
+                log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.update")
                 return
             }
-            utils.Log.Info("{{.ID}}.update - Reply")
+            log.Info("{{.ID}}.update - Reply")
 
             d.Conn.Publish("{{.ID}}.update.after", data)
         })
@@ -196,10 +198,10 @@ func (d *Database) Listen() {
             var before *models.{{.Name}}
             err := bson.UnmarshalJSON(m.Data, &before)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.create")
+                log.WithError(errors.Wrap(err, "error decoding event")).Error("{{.ID}}.create")
                 return
             }
-            utils.Log.Info("{{.ID}}.create")
+            log.Info("{{.ID}}.create")
 
             d.Conn.Publish("{{.ID}}.create.before", m.Data)
 
@@ -207,17 +209,17 @@ func (d *Database) Listen() {
 
             inter, err := manager.Create(before)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error creating data")).Error("{{.ID}}.create")
+                log.WithError(errors.Wrap(err, "error creating data")).Error("{{.ID}}.create")
                 return
             }
-            utils.Log.Info("{{.ID}}.create - Created")
+            log.Info("{{.ID}}.create - Created")
 
             data, err := bson.MarshalJSON(inter)
             if err != nil {
-                utils.Log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.create")
+                log.WithError(errors.Wrap(err, "error marshaling event")).Error("{{.ID}}.create")
                 return
             }
-            utils.Log.Info("{{.ID}}.create - Reply")
+            log.Info("{{.ID}}.create - Reply")
 
             d.Conn.Publish("{{.ID}}.create.after", data)
         })
