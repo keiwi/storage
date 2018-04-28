@@ -8,13 +8,13 @@ import (
 )
 
 func main() {
+	fileConfig := file.Config{Folder: "./logs", Filename: "%date%_storage.log"}
 	log.Log = log.NewLogger(log.DEBUG, []log.Reporter{
 		cli.NewCli(),
-		file.NewFile("./logs", "%date%_storage.log"),
+		file.NewFile(&fileConfig),
 	})
 
 	storage := storage.Storage{}
-
 	storage.StartStorage()
 
 }
